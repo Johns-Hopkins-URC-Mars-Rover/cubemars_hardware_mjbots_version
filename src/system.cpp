@@ -67,6 +67,7 @@ hardware_interface::CallbackReturn CubeMarsSystemHardware::on_init(
   hw_commands_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_commands_accelerations_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_commands_efforts_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  hw_commands_breaks_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   control_mode_.resize(info_.joints.size(), control_mode_t::UNDEFINED);
 
   for (const hardware_interface::ComponentInfo & joint : info_.joints)
@@ -219,6 +220,8 @@ CubeMarsSystemHardware::export_command_interfaces()
       info_.joints[i].name, hardware_interface::HW_IF_ACCELERATION, &hw_commands_accelerations_[i]));
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
       info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &hw_commands_efforts_[i]));
+    commmand_interfaces.emplace_back(hardware_interface::CommandInterface(
+      info_.joints[i].name, hardware_interface::HW_IF_BREAK, &hw_commands_breaks_[i]));
   }
 
   return command_interfaces;
@@ -516,6 +519,22 @@ hardware_interface::return_type CubeMarsSystemHardware::write(
             }
           }
           break;
+        }
+        case CURRENT_BREAK:
+        {
+          if (!std::isnan(hw_commands_breaks_[i]))
+          {
+            std::int32_t current = static_cast<std::int32_t>(std::clamp(hw_commands_breaks_[i], 0, max_currrent_limits_[i]));
+            std::uint8_t data[4];
+            data[0] = current >> 24;
+            data[1] = current >> 16;
+            data[2] = current >> 8;
+            data[3] = current;
+
+            if (!send_command(i, can_ids_[i] | (CURRENT_BREAK << 8), data, 4)) {
+              return hardware_interface::return_type::ERROR;
+            }
+          }
         }
         case SPEED_LOOP:
         {

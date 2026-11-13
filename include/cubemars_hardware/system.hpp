@@ -75,6 +75,7 @@ private:
   std::vector<double> hw_commands_velocities_;
   std::vector<double> hw_commands_accelerations_;
   std::vector<double> hw_commands_efforts_;
+  std::vector<double> hw_commands_breaks_;
   std::vector<double> hw_states_positions_;
   std::vector<double> hw_states_velocities_;
   std::vector<double> hw_states_efforts_;
@@ -97,6 +98,7 @@ private:
   enum control_mode_t : std::uint8_t
   {
     CURRENT_LOOP = 1,
+    CURRENT_BREAK = 2,
     SPEED_LOOP = 3,
     POSITION_LOOP = 4,
     POSITION_SPEED_LOOP = 6,
