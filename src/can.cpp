@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iomanip>
+#include <sstream>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -9,6 +11,32 @@ namespace cubemars_hardware
 {
 constexpr const char * kLogger = "CubeMarsSystemHardware";
 constexpr std::size_t kMaxCanFrames = 32;
+
+namespace
+{
+void log_can_frame(const mjbots::pi3hat::CanFrame & frame)
+{
+  const auto len = std::min<std::size_t>(frame.size, 8);
+
+  std::ostringstream data;
+  for (std::size_t i = 0; i < len; ++i) {
+    if (i != 0) {
+      data << ' ';
+    }
+    data << std::hex << std::uppercase
+         << std::setw(2) << std::setfill('0')
+         << static_cast<unsigned int>(frame.data[i]);
+  }
+
+  RCLCPP_ERROR(
+    rclcpp::get_logger(kLogger),
+    "RX CAN bus=%u id=0x%X len=%zu data=%s",
+    static_cast<unsigned int>(frame.bus),
+    static_cast<unsigned int>(frame.id),
+    len,
+    data.str().c_str());
+}
+}  // namespace
 
 mjbots::pi3hat::Pi3Hat::Configuration make_configuration(int can_bus)
 {
@@ -37,6 +65,7 @@ bool CanSocket::connect(
   can_bus_ = can_bus;
   can_mask_ = can_mask;
   rx_frames_.resize(kMaxCanFrames);
+
   try {
     pi3hat_ = std::make_unique<mjbots::pi3hat::Pi3Hat>(make_configuration(can_bus));
   } catch (const std::exception & exception) {
@@ -47,6 +76,7 @@ bool CanSocket::connect(
     pi3hat_.reset();
     return false;
   }
+
   return true;
 }
 
@@ -67,6 +97,7 @@ bool CanSocket::read_nonblocking(std::uint32_t & id, std::uint8_t data[], std::u
 
   const auto frame = received_frames_.front();
   received_frames_.pop_front();
+
   const auto copy_len = std::min<std::size_t>(frame.size, 8);
   std::memcpy(data, frame.data, copy_len);
   id = frame.id & can_mask_;
@@ -98,8 +129,10 @@ bool CanSocket::poll()
   }
 
   for (std::size_t i = 0; i < output.rx_can_size; ++i) {
+    log_can_frame(rx_frames_[i]);
     received_frames_.push_back(rx_frames_[i]);
   }
+
   return true;
 }
 
@@ -136,8 +169,10 @@ bool CanSocket::write_message(std::uint32_t id, const std::uint8_t data[], std::
   }
 
   for (std::size_t i = 0; i < output.rx_can_size; ++i) {
+    log_can_frame(rx_frames_[i]);
     received_frames_.push_back(rx_frames_[i]);
   }
+
   return true;
 }
-}
+}  // namespace cubemars_hardware
